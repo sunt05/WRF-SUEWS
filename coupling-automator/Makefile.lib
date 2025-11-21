@@ -1,0 +1,254 @@
+# SUEWS Library Makefile for WRF Coupling
+# Builds libsuews.a as a static library for linking with WRF
+#
+# Usage:
+#   make -f Makefile.lib            # Build library
+#   make -f Makefile.lib install    # Install library and modules
+#   make -f Makefile.lib clean      # Clean build artifacts
+
+##################################
+### COMPILER CONFIGURATION     ###
+##################################
+
+# Use the same profile system as main Makefile
+ifndef PROFILE
+$(info *** No "PROFILE" variable provided, assuming "gfortran")
+PROFILE = gfortran
+endif
+
+# Include platform-specific compiler settings
+include Makefile.$(PROFILE)
+
+# Fortran module builds are order-dependent; forbid parallelism to avoid race-y .mod usage.
+.NOTPARALLEL:
+
+# Override flags for library build (no NetCDF needed for library)
+# Add -fPIC for position-independent code (required for libraries)
+BASICFLAGS_LIB = $(filter-out -J%,$(BASICFLAGS))  # avoid duplicate -J paths; build rules add module dirs
+FCFLAGS_LIB = $(WARNFLAGS) $(BASICFLAGS_LIB) -fPIC -O2 \
+              -ffree-form -ffree-line-length-none \
+              -fallow-argument-mismatch -fallow-invalid-boz
+
+##################################
+### DIRECTORY STRUCTURE        ###
+##################################
+
+# Source directories
+DIR_SRC = ./src
+DIR_SPARTACUS = ./ext_lib/spartacus-surface
+
+# Build directories (separate from main SUEWS build)
+DIR_BUILD = ./build-lib
+DIR_BUILD_SPARTACUS = $(DIR_BUILD)/spartacus
+DIR_BUILD_SUEWS = $(DIR_BUILD)/suews
+
+# Install directories (WRF will reference these)
+DIR_INSTALL = ../../lib
+DIR_INSTALL_MOD = ../../include
+
+##################################
+### SOURCE FILES IN ORDER      ###
+##################################
+
+# SPARTACUS utilities (base dependencies)
+SPARTACUS_UTIL_SRC = \
+    $(DIR_SPARTACUS)/utilities/parkind1.F90 \
+    $(DIR_SPARTACUS)/utilities/print_matrix.F90 \
+    $(DIR_SPARTACUS)/utilities/yomhook.F90 \
+    $(DIR_SPARTACUS)/utilities/radiation_io.F90
+
+# Note: easy_netcdf.F90 excluded - not needed for WRF coupling
+
+# SPARTACUS radtool (radiation tools)
+SPARTACUS_RADTOOL_SRC = \
+    $(DIR_SPARTACUS)/radtool/radiation_constants.F90 \
+    $(DIR_SPARTACUS)/radtool/radtool_legendre_gauss.F90 \
+    $(DIR_SPARTACUS)/radtool/radtool_matrix.F90 \
+    $(DIR_SPARTACUS)/radtool/radtool_schur.F90 \
+    $(DIR_SPARTACUS)/radtool/radtool_eigen_decomposition.F90 \
+    $(DIR_SPARTACUS)/radtool/radtool_calc_matrices_lw_eig.F90 \
+    $(DIR_SPARTACUS)/radtool/radtool_calc_matrices_sw_eig.F90
+
+# SPARTACUS radsurf (radiation surface)
+SPARTACUS_RADSURF_SRC = \
+    $(DIR_SPARTACUS)/radsurf/radsurf_config.F90 \
+    $(DIR_SPARTACUS)/radsurf/radsurf_canopy_properties.F90 \
+    $(DIR_SPARTACUS)/radsurf/radsurf_boundary_conds_out.F90 \
+    $(DIR_SPARTACUS)/radsurf/radsurf_canopy_flux.F90 \
+    $(DIR_SPARTACUS)/radsurf/radsurf_sw_spectral_properties.F90 \
+    $(DIR_SPARTACUS)/radsurf/radsurf_lw_spectral_properties.F90 \
+    $(DIR_SPARTACUS)/radsurf/radsurf_overlap.F90 \
+    $(DIR_SPARTACUS)/radsurf/radsurf_forest_sw.F90 \
+    $(DIR_SPARTACUS)/radsurf/radsurf_forest_lw.F90 \
+    $(DIR_SPARTACUS)/radsurf/radsurf_urban_sw.F90 \
+    $(DIR_SPARTACUS)/radsurf/radsurf_urban_lw.F90 \
+    $(DIR_SPARTACUS)/radsurf/radsurf_simple_spectrum.F90 \
+    $(DIR_SPARTACUS)/radsurf/radsurf_interface.F90
+
+# All SPARTACUS sources
+SPARTACUS_SRC = $(SPARTACUS_UTIL_SRC) $(SPARTACUS_RADTOOL_SRC) $(SPARTACUS_RADSURF_SRC)
+
+# SUEWS utilities (base dependencies)
+SUEWS_UTILS_SRC = \
+    $(DIR_SRC)/suews_ctrl_const.f95 \
+    $(DIR_SRC)/suews_ctrl_type.f95 \
+    $(DIR_SRC)/suews_util_stringmod.f95 \
+    $(DIR_SRC)/suews_util_qsort.f95 \
+    $(DIR_SRC)/suews_util_time.f95 \
+    $(DIR_SRC)/suews_util_meteo.f95 \
+    $(DIR_SRC)/suews_util_datetime.f95 \
+    $(DIR_SRC)/suews_util_minpack.f95
+
+# SUEWS physics modules
+SUEWS_PHYS_SRC = \
+    $(DIR_SRC)/suews_phys_narp.f95 \
+    $(DIR_SRC)/suews_phys_spartacus.f95 \
+    $(DIR_SRC)/suews_phys_atmmoiststab.f95 \
+    $(DIR_SRC)/suews_phys_resist.f95 \
+    $(DIR_SRC)/suews_ctrl_error.f95 \
+    $(DIR_SRC)/suews_ctrl_input.f95 \
+    $(DIR_SRC)/suews_phys_bluews.f95 \
+    $(DIR_SRC)/suews_phys_waterdist.f95 \
+    $(DIR_SRC)/suews_phys_evap.f95 \
+    $(DIR_SRC)/suews_phys_snow.f95 \
+    $(DIR_SRC)/suews_phys_dailystate.f95 \
+    $(DIR_SRC)/suews_phys_estm.f95 \
+    $(DIR_SRC)/suews_phys_ehc.f95 \
+    $(DIR_SRC)/suews_ctrl_output.f95 \
+    $(DIR_SRC)/suews_phys_ohm.f95 \
+    $(DIR_SRC)/suews_phys_anohm.f95 \
+    $(DIR_SRC)/suews_phys_lumps.f95 \
+    $(DIR_SRC)/suews_phys_anthro.f95 \
+    $(DIR_SRC)/suews_phys_rslprof.f95 \
+    $(DIR_SRC)/suews_phys_biogenco2.f95 \
+    $(DIR_SRC)/suews_phys_solweig.f95 \
+    $(DIR_SRC)/suews_phys_beers.f95 \
+    $(DIR_SRC)/suews_phys_stebbs.f95
+
+# SUEWS driver
+SUEWS_DRIVER_SRC = \
+    $(DIR_SRC)/suews_ctrl_driver.f95
+
+# WRF coupling interface
+SUEWS_WRF_SRC = \
+    $(DIR_SRC)/suews_ctrl_sumin.f95
+
+# Auto-generated version file (handled separately)
+SUEWS_VER_SRC = $(DIR_SRC)/suews_ctrl_ver.f95
+
+# All SUEWS sources
+SUEWS_SRC = $(SUEWS_UTILS_SRC) $(SUEWS_PHYS_SRC) $(SUEWS_VER_SRC) \
+            $(SUEWS_DRIVER_SRC) $(SUEWS_WRF_SRC)
+
+# All sources combined
+ALL_SRC = $(SPARTACUS_SRC) $(SUEWS_SRC)
+
+# Object files (place in build directory)
+SPARTACUS_OBJ = $(patsubst $(DIR_SPARTACUS)/%.F90,$(DIR_BUILD_SPARTACUS)/%.o,$(SPARTACUS_SRC))
+SUEWS_OBJ = $(patsubst $(DIR_SRC)/%.f95,$(DIR_BUILD_SUEWS)/%.o,$(SUEWS_SRC))
+ALL_OBJ = $(SPARTACUS_OBJ) $(SUEWS_OBJ)
+
+# Library output
+LIBSUEWS = $(DIR_INSTALL)/libsuews.a
+
+##################################
+### BUILD RULES                ###
+##################################
+
+.PHONY: all install clean help
+
+all: $(LIBSUEWS)
+
+# Generate version file before building
+$(SUEWS_VER_SRC): force
+	@echo "Generating version info for library build..."
+	@echo "MODULE version" > $@
+	@echo "IMPLICIT NONE" >> $@
+	@echo "CHARACTER(len=90) :: git_commit = 'WRF-SUEWS-2025'" >> $@
+	@echo "CHARACTER(len=90) :: compiler_ver = '$(shell $(FC) --version | head -n 1)'" >> $@
+	@echo "END MODULE version" >> $@
+
+# SPARTACUS compilation rules (F90 -> o)
+$(DIR_BUILD_SPARTACUS)/utilities/%.o: $(DIR_SPARTACUS)/utilities/%.F90
+	@mkdir -p $(dir $@)
+	$(FC) $(FCFLAGS_LIB) -J$(DIR_BUILD_SPARTACUS) -I$(DIR_BUILD_SPARTACUS) -c $< -o $@
+
+$(DIR_BUILD_SPARTACUS)/radtool/%.o: $(DIR_SPARTACUS)/radtool/%.F90
+	@mkdir -p $(dir $@)
+	$(FC) $(FCFLAGS_LIB) -J$(DIR_BUILD_SPARTACUS) -I$(DIR_BUILD_SPARTACUS) -c $< -o $@
+
+$(DIR_BUILD_SPARTACUS)/radsurf/%.o: $(DIR_SPARTACUS)/radsurf/%.F90
+	@mkdir -p $(dir $@)
+	$(FC) $(FCFLAGS_LIB) -J$(DIR_BUILD_SPARTACUS) -I$(DIR_BUILD_SPARTACUS) -c $< -o $@
+
+# SUEWS compilation rules (f95 -> o)
+$(DIR_BUILD_SUEWS)/%.o: $(DIR_SRC)/%.f95
+	@mkdir -p $(dir $@)
+	$(FC) $(FCFLAGS_LIB) -J$(DIR_BUILD_SUEWS) -I$(DIR_BUILD_SUEWS) -I$(DIR_BUILD_SPARTACUS) -c $< -o $@
+
+# Create static library
+$(LIBSUEWS): $(ALL_OBJ)
+	@mkdir -p $(DIR_INSTALL)
+	ar rcs $@ $^
+	@echo "================================================"
+	@echo "SUEWS library built successfully!"
+	@echo "  Library: $(LIBSUEWS)"
+	@echo "  Size: $$(du -h $(LIBSUEWS) | cut -f1)"
+	@echo "  Modules: $$(ls $(DIR_BUILD_SPARTACUS)/*.mod $(DIR_BUILD_SUEWS)/*.mod 2>/dev/null | wc -l)"
+	@echo "================================================"
+
+# Install library and module files
+install: $(LIBSUEWS)
+	@mkdir -p $(DIR_INSTALL_MOD)
+	@echo "Installing SUEWS modules to $(DIR_INSTALL_MOD)..."
+	@cp $(DIR_BUILD_SPARTACUS)/*.mod $(DIR_INSTALL_MOD)/ 2>/dev/null || true
+	@cp $(DIR_BUILD_SUEWS)/*.mod $(DIR_INSTALL_MOD)/ 2>/dev/null || true
+	@echo "================================================"
+	@echo "SUEWS library installed successfully!"
+	@echo ""
+	@echo "Installation locations:"
+	@echo "  Library:  $(LIBSUEWS)"
+	@echo "  Modules:  $(DIR_INSTALL_MOD)/*.mod"
+	@echo ""
+	@echo "Next steps for WRF-SUEWS coupling:"
+	@echo "  1. cd ../../coupling-automator"
+	@echo "  2. make"
+	@echo "  3. cd ../compilation-YYYYMMDD"
+	@echo "  4. ./configure"
+	@echo "  5. ./compile em_real"
+	@echo "================================================"
+
+# Clean build artifacts
+clean:
+	@echo "Cleaning SUEWS library build..."
+	rm -rf $(DIR_BUILD)
+	rm -f $(LIBSUEWS)
+	rm -f $(DIR_INSTALL_MOD)/*.mod
+	rm -f $(SUEWS_VER_SRC)
+	@echo "Clean complete."
+
+# Help message
+help:
+	@echo "SUEWS Library Build System for WRF Coupling"
+	@echo ""
+	@echo "Usage:"
+	@echo "  make -f Makefile.lib [PROFILE=<profile>]"
+	@echo "  make -f Makefile.lib install"
+	@echo "  make -f Makefile.lib clean"
+	@echo ""
+	@echo "Profiles:"
+	@echo "  gfortran (default) - GNU Fortran compiler"
+	@echo "  ifort              - Intel Fortran compiler"
+	@echo ""
+	@echo "Parallel build:"
+	@echo "  make -f Makefile.lib -j4"
+	@echo ""
+	@echo "Current configuration:"
+	@echo "  FC:      $(FC)"
+	@echo "  PROFILE: $(PROFILE)"
+	@echo "  Library: $(LIBSUEWS)"
+	@echo "  Modules: $(DIR_INSTALL_MOD)"
+
+# Force rebuild of version file
+.PHONY: force
+force:

@@ -55,6 +55,11 @@ jobs:
         nc-config --all || true
         nf-config --all || true
 
+    - name: Copy Makefile.lib to SUEWS directory
+      run: |
+        echo "=== Copying Makefile.lib from coupling-automator ==="
+        cp coupling-automator/Makefile.lib SUEWS/src/suews/
+
     - name: Build SUEWS library
       working-directory: SUEWS/src/suews
       run: |

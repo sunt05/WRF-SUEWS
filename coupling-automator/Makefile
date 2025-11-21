@@ -30,6 +30,8 @@ build-lib:
 	@echo "=========================================="
 	@echo " Building SUEWS library..."
 	@echo "=========================================="
+	@echo "Copying Makefile.lib to SUEWS directory..."
+	@cp Makefile.lib ../SUEWS/src/suews/
 	cd ../SUEWS/src/suews && $(MAKE) -f Makefile.lib clean
 	cd ../SUEWS/src/suews && $(MAKE) -f Makefile.lib -j4
 	cd ../SUEWS/src/suews && $(MAKE) -f Makefile.lib install
