@@ -1,0 +1,7 @@
+{
+    "scripts": {
+        "setup": "git fetch origin && git merge origin/master && for remote in $(git remote | grep -v '^origin$'); do git remote remove \"$remote\"; done && git submodule init && git submodule update && uv venv && echo '✓ Setup complete. Activate: source .venv/bin/activate. Run: uv pip install -e . when ready to install dependencies.'",
+        "run": "cd WSPS && ../.venv/bin/python wsps.py && cd ../coupling-automator && make && echo 'Compilation directory ready: compilation-$(date +%Y%m%d). Next: cd ../compilation-$(date +%Y%m%d) && ./configure && ./compile em_real'",
+        "archive": "cd $CONDUCTOR_ROOT_PATH && git fetch origin && git pull origin master"
+    }
+}
