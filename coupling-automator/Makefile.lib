@@ -130,15 +130,16 @@ SUEWS_DRIVER_SRC = \
     $(DIR_SRC)/suews_ctrl_driver.f95
 
 # WRF coupling interface
-SUEWS_WRF_SRC = \
-    $(DIR_SRC)/suews_ctrl_sumin.f95
+# NOTE: suews_ctrl_sumin.f95 excluded from library - WRF calls SUEWS_cal_Main directly
+# SUEWS_WRF_SRC = \
+#     $(DIR_SRC)/suews_ctrl_sumin.f95
 
 # Auto-generated version file (handled separately)
 SUEWS_VER_SRC = $(DIR_SRC)/suews_ctrl_ver.f95
 
 # All SUEWS sources
 SUEWS_SRC = $(SUEWS_UTILS_SRC) $(SUEWS_PHYS_SRC) $(SUEWS_VER_SRC) \
-            $(SUEWS_DRIVER_SRC) $(SUEWS_WRF_SRC)
+            $(SUEWS_DRIVER_SRC)
 
 # All sources combined
 ALL_SRC = $(SPARTACUS_SRC) $(SUEWS_SRC)
